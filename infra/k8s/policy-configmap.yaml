@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aegiscloud-healing-policy
+  namespace: aegiscloud
+data:
+  mode: dry-run
+  maxScaleStep: "1"
+  maxReplicas: "6"
+  rollbackWindowMinutes: "30"
+  requireHumanApprovalForHighRisk: "true"
+

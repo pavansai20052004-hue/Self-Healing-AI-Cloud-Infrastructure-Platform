@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chaos-simulator
+  namespace: aegiscloud
+spec:
+  schedule: "*/20 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: chaos-simulator
+              image: bitnami/kubectl:1.31
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Dry-run chaos event: would restart one payment-service pod"
+                  kubectl get pods -n aegiscloud -l app=payment-service
+

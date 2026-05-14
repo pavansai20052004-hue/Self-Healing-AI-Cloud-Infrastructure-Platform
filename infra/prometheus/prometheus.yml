@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 10s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: monitoring-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["monitoring-service:8081"]
+
+  - job_name: healing-engine
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["healing-engine:8082"]
+
+  - job_name: incident-intelligence-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["incident-intelligence-service:8083"]
+

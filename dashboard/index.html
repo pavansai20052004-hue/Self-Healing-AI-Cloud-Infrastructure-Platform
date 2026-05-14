@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AegisCloud Console</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">AC</div>
+        <div>
+          <strong>AegisCloud</strong>
+          <span>Self-healing ops</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <a class="active" href="#overview">Overview</a>
+        <a href="#incidents">Incidents</a>
+        <a href="#policies">Policies</a>
+        <a href="#autopilot">Autopilot</a>
+        <a href="#timeline">Replay</a>
+      </nav>
+    </aside>
+
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Production cluster</p>
+          <h1>Infrastructure Command Center</h1>
+        </div>
+        <div class="cluster-state">
+          <span class="pulse"></span>
+          <span id="clusterState">Autonomous dry-run</span>
+        </div>
+      </header>
+
+      <section class="trust-grid" aria-label="Autonomy and governance status">
+        <article class="trust-tile">
+          <span>Autonomy</span>
+          <strong id="autonomyMode">Supervised</strong>
+        </article>
+        <article class="trust-tile">
+          <span>SLO burn rate</span>
+          <strong id="burnRate">0.8x</strong>
+        </article>
+        <article class="trust-tile">
+          <span>Guardrails</span>
+          <strong id="guardrailState">Ready</strong>
+        </article>
+        <article class="trust-tile">
+          <span>Audit events</span>
+          <strong id="auditCount">1</strong>
+        </article>
+      </section>
+
+      <section id="overview" class="metrics-grid" aria-label="Service metrics"></section>
+
+      <section class="workbench">
+        <div class="panel action-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Chaos simulator</p>
+              <h2>Failure Injection</h2>
+            </div>
+          </div>
+          <div class="button-row">
+            <button data-scenario="cpu">CPU spike</button>
+            <button data-scenario="memory">Memory leak</button>
+            <button data-scenario="latency">Latency</button>
+            <button data-scenario="errors">5xx surge</button>
+          </div>
+        </div>
+
+        <div id="incidents" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Incident intelligence</p>
+              <h2>Current Diagnosis</h2>
+            </div>
+            <button id="healButton" class="primary">Heal</button>
+          </div>
+          <div id="incidentSummary" class="incident-summary"></div>
+        </div>
+      </section>
+
+      <section class="workbench">
+        <div id="policies" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Policy ranking</p>
+              <h2>Auto-Remediation Plan</h2>
+            </div>
+          </div>
+          <div id="policyList" class="policy-list"></div>
+        </div>
+
+        <div id="autopilot" class="panel autopilot-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Counterfactual autopilot</p>
+              <h2>Safety Plan</h2>
+            </div>
+          </div>
+          <div class="plan-scoreboard">
+            <div>
+              <span>Recovery</span>
+              <strong id="planRecovery">96%</strong>
+            </div>
+            <div>
+              <span>Residual risk</span>
+              <strong id="planRisk">4%</strong>
+            </div>
+            <div>
+              <span>Blast radius</span>
+              <strong id="planBlast">0%</strong>
+            </div>
+            <div>
+              <span>Confidence</span>
+              <strong id="planConfidence">88%</strong>
+            </div>
+          </div>
+          <div id="autopilotRecommendation" class="plan-callout"></div>
+          <ol id="autopilotSteps" class="autopilot-steps"></ol>
+          <div id="rollbackTriggers" class="rollback-triggers"></div>
+        </div>
+      </section>
+
+      <section id="timeline" class="panel timeline-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Audit and replay</p>
+            <h2>Control Timeline</h2>
+          </div>
+        </div>
+        <ol id="timelineList" class="timeline"></ol>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

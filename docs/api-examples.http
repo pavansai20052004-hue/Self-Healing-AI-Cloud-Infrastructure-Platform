@@ -1,0 +1,132 @@
+### Monitoring demo anomaly
+GET http://localhost:8081/api/v1/demo/anomaly
+
+### Analyze metric samples
+POST http://localhost:8081/api/v1/metrics/analyze
+Content-Type: application/json
+
+{
+  "serviceName": "payment-service",
+  "samples": [
+    { "cpuUsage": 48, "memoryUsage": 52, "latencyMs": 110, "errorRate": 0.004, "diskUsage": 36, "replicas": 2 },
+    { "cpuUsage": 72, "memoryUsage": 71, "latencyMs": 240, "errorRate": 0.010, "diskUsage": 40, "replicas": 2 },
+    { "cpuUsage": 96, "memoryUsage": 93, "latencyMs": 1220, "errorRate": 0.087, "diskUsage": 44, "replicas": 2 }
+  ]
+}
+
+### AI prediction service
+POST http://localhost:8090/predict
+Content-Type: application/json
+
+{
+  "serviceName": "payment-service",
+  "samples": [
+    { "cpuUsage": 48, "memoryUsage": 52, "latencyMs": 110, "errorRate": 0.004, "diskUsage": 36, "replicas": 2 },
+    { "cpuUsage": 94, "memoryUsage": 91, "latencyMs": 920, "errorRate": 0.061, "diskUsage": 44, "replicas": 2 }
+  ]
+}
+
+### AI log classification
+POST http://localhost:8090/classify-log
+Content-Type: application/json
+
+{
+  "line": "ERROR payment-service 5xx spike after rollout v2.4.1"
+}
+
+### Governed healing decision
+POST http://localhost:8082/api/v1/heal/governed-decisions
+Content-Type: application/json
+
+{
+  "dryRun": false,
+  "prediction": {
+    "predictionId": "pred-demo",
+    "serviceName": "payment-service",
+    "type": "ERROR_RATE",
+    "severity": "CRITICAL",
+    "confidence": 0.93,
+    "summary": "5xx rate surged after a recent deployment.",
+    "evidence": ["latest error rate: 9.2%", "deployment age: 8 minutes"],
+    "recommendedAction": "ROLLBACK_DEPLOYMENT",
+    "createdAt": "2026-05-14T18:00:00Z"
+  },
+  "state": {
+    "serviceName": "payment-service",
+    "replicas": 3,
+    "minReplicas": 2,
+    "maxReplicas": 6,
+    "lastDeploymentAgeMinutes": 8,
+    "restartCountLastHour": 2,
+    "queueDepth": 2400,
+    "currentVersion": "v2.4.1",
+    "previousVersion": "v2.4.0"
+  },
+  "tenantProfile": {
+    "tenantId": "fintech-prod",
+    "displayName": "Northstar Payments",
+    "environment": "production",
+    "autonomyMode": "SUPERVISED",
+    "highRiskApprovalRequired": true,
+    "maxReplicas": 6,
+    "maxActionsPerIncident": 2,
+    "actionCooldownSeconds": 180,
+    "maxAllowedBurnRate": 14.4,
+    "allowedActions": ["SCALE_OUT", "RESTART_SERVICE", "ROLLBACK_DEPLOYMENT", "CLEAR_QUEUE", "THROTTLE_TRAFFIC", "PRUNE_LOGS", "OPEN_INCIDENT"]
+  },
+  "sloBurnRate": {
+    "serviceName": "payment-service",
+    "burnRate": 29.2,
+    "budgetRemainingPercent": 12.6,
+    "status": "BURNING",
+    "recommendation": "Prioritize low-risk remediation and page the owning team."
+  }
+}
+
+### Counterfactual autopilot plan
+POST http://localhost:8082/api/v1/heal/autopilot-plans
+Content-Type: application/json
+
+{
+  "dryRun": false,
+  "prediction": {
+    "predictionId": "pred-demo",
+    "serviceName": "payment-service",
+    "type": "ERROR_RATE",
+    "severity": "CRITICAL",
+    "confidence": 0.93,
+    "summary": "5xx rate surged after a recent deployment.",
+    "evidence": ["latest error rate: 9.2%", "deployment age: 8 minutes"],
+    "recommendedAction": "ROLLBACK_DEPLOYMENT"
+  },
+  "state": {
+    "serviceName": "payment-service",
+    "replicas": 3,
+    "minReplicas": 2,
+    "maxReplicas": 6,
+    "lastDeploymentAgeMinutes": 8,
+    "restartCountLastHour": 2,
+    "queueDepth": 2400,
+    "currentVersion": "v2.4.1",
+    "previousVersion": "v2.4.0"
+  },
+  "tenantProfile": {
+    "tenantId": "fintech-prod",
+    "displayName": "Northstar Payments",
+    "environment": "production",
+    "autonomyMode": "SUPERVISED",
+    "highRiskApprovalRequired": true,
+    "maxReplicas": 6,
+    "maxActionsPerIncident": 2,
+    "actionCooldownSeconds": 180,
+    "maxAllowedBurnRate": 14.4,
+    "allowedActions": ["SCALE_OUT", "RESTART_SERVICE", "ROLLBACK_DEPLOYMENT", "CLEAR_QUEUE", "THROTTLE_TRAFFIC", "PRUNE_LOGS", "OPEN_INCIDENT"]
+  },
+  "sloBurnRate": {
+    "serviceName": "payment-service",
+    "burnRate": 29.2,
+    "budgetRemainingPercent": 12.6,
+    "status": "BURNING",
+    "recommendation": "Prioritize low-risk remediation and page the owning team."
+  }
+}

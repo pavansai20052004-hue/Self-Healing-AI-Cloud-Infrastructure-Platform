@@ -1,0 +1,89 @@
+services:
+  monitoring-service:
+    build:
+      context: ../..
+      dockerfile: monitoring-service/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+
+  healing-engine:
+    build:
+      context: ../..
+      dockerfile: healing-engine/Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+
+  incident-intelligence-service:
+    build:
+      context: ../..
+      dockerfile: incident-intelligence-service/Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+
+  ai-prediction-service:
+    build:
+      context: ../../ai-prediction-service
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: aegiscloud
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  kafka:
+    image: redpandadata/redpanda:v24.2.10
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - 512M
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
+      - --check=false
+    ports:
+      - "9092:9092"
+      - "9644:9644"
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - monitoring-service
+      - healing-engine
+      - incident-intelligence-service
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus

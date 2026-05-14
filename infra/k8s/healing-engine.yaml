@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healing-engine
+  namespace: aegiscloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healing-engine
+  template:
+    metadata:
+      labels:
+        app: healing-engine
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8082"
+    spec:
+      serviceAccountName: healing-engine
+      containers:
+        - name: healing-engine
+          image: aegiscloud/healing-engine:0.1.0
+          ports:
+            - containerPort: 8082
+          env:
+            - name: AEGISCLOUD_HEALING_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: aegiscloud-healing-policy
+                  key: mode
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: healing-engine
+  namespace: aegiscloud
+spec:
+  selector:
+    app: healing-engine
+  ports:
+    - port: 8082
+      targetPort: 8082
+

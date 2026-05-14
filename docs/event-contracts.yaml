@@ -1,0 +1,67 @@
+events:
+  metrics.ingested:
+    description: Raw metric window accepted by the monitoring service.
+    key: tenantId.serviceName
+    payload:
+      tenantId: string
+      serviceName: string
+      samples: array
+      receivedAt: timestamp
+
+  anomaly.detected:
+    description: Monitoring service found one or more incident predictions.
+    key: tenantId.serviceName
+    payload:
+      tenantId: string
+      serviceName: string
+      predictions: array
+      sloBurnRate: object
+      correlationId: string
+
+  healing.decisioned:
+    description: Healing engine ranked remediation actions and evaluated guardrails.
+    key: tenantId.incidentId
+    payload:
+      tenantId: string
+      incidentId: string
+      decisionId: string
+      executionMode: string
+      actions: array
+      guardrailAssessments: array
+
+  autopilot.plan.generated:
+    description: Counterfactual planner generated blast-radius, canary, rollback, and recovery estimates before execution.
+    key: tenantId.incidentId
+    payload:
+      tenantId: string
+      incidentId: string
+      planId: string
+      serviceName: string
+      recommendation: string
+      expectedRecoveryProbability: number
+      residualRiskScore: number
+      maxBlastRadiusPercent: number
+      requiresApproval: boolean
+      impactEstimates: array
+      steps: array
+      rollbackTriggers: array
+
+  healing.outcome.recorded:
+    description: Verification loop recorded whether a remediation succeeded.
+    key: tenantId.incidentId
+    payload:
+      tenantId: string
+      incidentId: string
+      actionType: string
+      recovered: boolean
+      downtimeSeconds: integer
+      reward: number
+
+  incident.reported:
+    description: Incident intelligence generated a root-cause report.
+    key: tenantId.incidentId
+    payload:
+      tenantId: string
+      incidentId: string
+      markdown: string
+      generatedAt: timestamp

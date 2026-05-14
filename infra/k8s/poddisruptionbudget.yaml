@@ -1,0 +1,33 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: monitoring-service
+  namespace: aegiscloud
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: monitoring-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: healing-engine
+  namespace: aegiscloud
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: healing-engine
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: incident-intelligence-service
+  namespace: aegiscloud
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: incident-intelligence-service
+
