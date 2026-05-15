@@ -72,6 +72,12 @@ This path uses only the Python standard library.
 
 ## Static Dashboard
 
+Live public dashboard:
+
+```text
+https://pavansai20052004-hue.github.io/Self-Healing-AI-Cloud-Infrastructure-Platform/
+```
+
 Launch the UI from VS Code or PowerShell:
 
 ```powershell

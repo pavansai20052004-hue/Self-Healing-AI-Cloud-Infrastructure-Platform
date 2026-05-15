@@ -13,6 +13,8 @@ const api = {
 };
 
 const requestTimeoutMs = 3500;
+const browserHost = typeof window === "undefined" ? "localhost" : window.location.hostname;
+const liveApiEnabled = ["", "localhost", "127.0.0.1"].includes(browserHost);
 
 let activeIncident = {
   type: "No active incident",
@@ -188,7 +190,15 @@ async function injectScenario(scenario) {
   });
   clusterState.textContent = "Incident predicted, querying live APIs";
   render();
-  await hydrateFromLiveApis(scenario, requestId);
+  if (liveApiEnabled) {
+    await hydrateFromLiveApis(scenario, requestId);
+  } else {
+    addTimeline({
+      title: "Public demo mode active",
+      detail: "GitHub Pages is static hosting, so this view uses dashboard simulation. Run locally for live Spring Boot and FastAPI calls.",
+    });
+    clusterState.textContent = "Public demo mode";
+  }
   if (requestId === requestSequence) {
     isHydrating = false;
   }
