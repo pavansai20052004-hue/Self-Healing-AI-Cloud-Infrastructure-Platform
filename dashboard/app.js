@@ -45,6 +45,10 @@ let timeline = [
   { title: "Cluster baseline captured", detail: "Metrics, logs, policy scores, and tenant guardrails synchronized." },
 ];
 
+let activeScenario = null;
+let requestSequence = 0;
+let isHydrating = false;
+
 const metricsGrid = document.querySelector("#overview");
 const incidentSummary = document.querySelector("#incidentSummary");
 const policyList = document.querySelector("#policyList");
@@ -61,6 +65,7 @@ const planConfidence = document.querySelector("#planConfidence");
 const autopilotRecommendation = document.querySelector("#autopilotRecommendation");
 const autopilotSteps = document.querySelector("#autopilotSteps");
 const rollbackTriggers = document.querySelector("#rollbackTriggers");
+const healButton = document.querySelector("#healButton");
 
 document.querySelectorAll("[data-scenario]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -68,10 +73,15 @@ document.querySelectorAll("[data-scenario]").forEach((button) => {
   });
 });
 
-document.querySelector("#healButton").addEventListener("click", healIncident);
+healButton.addEventListener("click", healIncident);
 
 async function injectScenario(scenario) {
+  activeScenario = scenario;
+  const requestId = ++requestSequence;
+  isHydrating = true;
   const service = services[0];
+  resetPaymentService();
+
   if (scenario === "cpu") {
     Object.assign(service, { cpu: 98, memory: 72, latency: 520, errorRate: 2.4, status: "degraded" });
     activeIncident = {
@@ -168,29 +178,32 @@ async function injectScenario(scenario) {
     });
   }
 
-  timeline.unshift({
+  addTimeline({
     title: `${activeIncident.type} detected`,
     detail: `${activeIncident.service} moved into ${activeIncident.severity} state.`,
   });
-  timeline.unshift({
+  addTimeline({
     title: "Guardrails evaluated",
     detail: `${governance.guardrails} under ${governance.autonomy.toLowerCase()} autonomy.`,
   });
   clusterState.textContent = "Incident predicted, querying live APIs";
   render();
-  await hydrateFromLiveApis(scenario);
+  await hydrateFromLiveApis(scenario, requestId);
+  if (requestId === requestSequence) {
+    isHydrating = false;
+  }
   render();
 }
 
 function healIncident() {
   const service = services[0];
-  const firstPolicy = policies[0];
+  const executablePolicy = policies.find(isApprovedPolicy);
 
-  if (!firstPolicy || activeIncident.severity === "resolved") {
+  if (isHydrating || !executablePolicy || activeIncident.severity === "resolved") {
     return;
   }
 
-  if (firstPolicy.action === "SCALE_OUT") {
+  if (executablePolicy.action === "SCALE_OUT") {
     service.replicas += 1;
   }
 
@@ -202,16 +215,16 @@ function healIncident() {
     status: "healthy",
   });
 
-  timeline.unshift({
-    title: `${firstPolicy.action} executed`,
-    detail: `${activeIncident.service} recovered in dry-run simulation.`,
+  addTimeline({
+    title: `${executablePolicy.action} executed`,
+    detail: `${activeIncident.service} recovered after approved remediation.`,
   });
 
   activeIncident = {
     type: "Incident resolved",
     service: service.name,
     severity: "resolved",
-    summary: `${firstPolicy.action} returned service metrics below SLO thresholds.`,
+    summary: `${executablePolicy.action} returned service metrics below SLO thresholds.`,
   };
   policies = [
     { action: "VERIFY", reason: "Continue watching the service for 2 minutes.", risk: "low", verdict: "approved" },
@@ -230,7 +243,7 @@ function healIncident() {
   render();
 }
 
-async function hydrateFromLiveApis(scenario) {
+async function hydrateFromLiveApis(scenario, requestId) {
   const service = services[0];
   const samples = scenarioSamples(scenario);
 
@@ -252,6 +265,10 @@ async function hydrateFromLiveApis(scenario) {
       throw new Error("Monitoring API returned no incident prediction.");
     }
 
+    if (requestId !== requestSequence) {
+      return;
+    }
+
     const healingPayload = {
       dryRun: false,
       prediction: leadPrediction,
@@ -264,6 +281,12 @@ async function hydrateFromLiveApis(scenario) {
       postJson(`${api.healing}/governed-decisions`, healingPayload),
       postJson(`${api.healing}/autopilot-plans`, healingPayload),
     ]);
+
+    if (requestId !== requestSequence) {
+      return;
+    }
+
+    applyLatestSampleToService(service, samples.at(-1));
 
     activeIncident = {
       type: leadPrediction.type,
@@ -279,13 +302,24 @@ async function hydrateFromLiveApis(scenario) {
       guardrails: guardrailSummary(decision),
     };
     clusterState.textContent = "Live backend APIs connected";
-    timeline.unshift({
-      title: "Live backend APIs responded",
-      detail: `Monitoring found ${predictions.length} prediction(s), AI labeled ${aiPrediction.labels.join(", ")}, and healing returned ${plan.executionMode}.`,
+    addTimeline({
+      title: "Live Monitoring analyzed metrics",
+      detail: `${predictions.length} prediction(s): ${predictions.map((prediction) => prediction.type).join(", ")}.`,
+    });
+    addTimeline({
+      title: "Live AI Prediction scored risk",
+      detail: `Risk ${Math.round((aiPrediction.riskScore || 0) * 100)}%, labels ${aiPrediction.labels.join(", ")}.`,
+    });
+    addTimeline({
+      title: "Live Healing Autopilot planned response",
+      detail: `${plan.recommendation}`,
     });
   } catch (error) {
+    if (requestId !== requestSequence) {
+      return;
+    }
     clusterState.textContent = "Simulation mode, backend fallback";
-    timeline.unshift({
+    addTimeline({
       title: "Backend API fallback",
       detail: `Dashboard kept the local simulation because live API hydration failed: ${error.message}`,
     });
@@ -441,6 +475,40 @@ function policiesFromDecision(decision) {
   }));
 }
 
+function resetPaymentService() {
+  Object.assign(services[0], {
+    cpu: 48,
+    memory: 54,
+    latency: 118,
+    errorRate: 0.4,
+    replicas: 2,
+    status: "healthy",
+  });
+}
+
+function applyLatestSampleToService(service, sample) {
+  if (!sample) {
+    return;
+  }
+  Object.assign(service, {
+    cpu: sample.cpuUsage,
+    memory: sample.memoryUsage,
+    latency: sample.latencyMs,
+    errorRate: sample.errorRate * 100,
+    replicas: sample.replicas,
+    status: sample.errorRate >= 0.08 ? "failing" : "degraded",
+  });
+}
+
+function isApprovedPolicy(policy) {
+  return policy && policy.verdict === "approved";
+}
+
+function addTimeline(event) {
+  timeline.unshift(event);
+  timeline = timeline.slice(0, 20);
+}
+
 function safetyPlanFromApi(plan) {
   const lead = (plan.impactEstimates || [])[0];
   return {
@@ -483,6 +551,7 @@ function render() {
   renderPolicies();
   renderAutopilot();
   renderTimeline();
+  renderHealButton();
 }
 
 function renderGovernance() {
@@ -559,12 +628,32 @@ function renderAutopilot() {
 }
 
 function renderTimeline() {
-  timelineList.innerHTML = timeline.slice(0, 6).map((event) => `
+  timelineList.innerHTML = timeline.slice(0, 8).map((event) => `
     <li>
       <strong>${event.title}</strong>
       ${event.detail}
     </li>
   `).join("");
+}
+
+function renderHealButton() {
+  if (isHydrating) {
+    healButton.disabled = true;
+    healButton.textContent = "Checking";
+    return;
+  }
+  if (activeIncident.severity === "resolved") {
+    healButton.disabled = true;
+    healButton.textContent = "Resolved";
+    return;
+  }
+  if (policies.some(isApprovedPolicy)) {
+    healButton.disabled = false;
+    healButton.textContent = "Heal";
+    return;
+  }
+  healButton.disabled = true;
+  healButton.textContent = "Approval needed";
 }
 
 function createSafetyPlan({

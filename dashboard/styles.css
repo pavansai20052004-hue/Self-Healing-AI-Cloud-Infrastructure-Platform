@@ -289,11 +289,24 @@ button:hover {
   background: #eef4fb;
 }
 
+button:disabled {
+  border-color: #d7dee8;
+  background: #eef2f7;
+  color: #7b8796;
+  cursor: not-allowed;
+}
+
 button.primary {
   border-color: var(--blue);
   background: var(--blue);
   color: #ffffff;
   min-width: 94px;
+}
+
+button.primary:disabled {
+  border-color: #c7d2df;
+  background: #d9e2ec;
+  color: #637083;
 }
 
 .incident-summary {
