@@ -46,6 +46,22 @@ These paths need only Java 21.
 
 The core demo shows detect -> heal -> report. The enterprise demo adds SLO burn-rate intelligence, tenant policy, guardrail verdicts, counterfactual autopilot planning, lifecycle transitions, and an audit trail.
 
+## Full Local Platform
+
+To run the UI and all local APIs together:
+
+```powershell
+.\scripts\start-platform.ps1 -Rebuild -Restart
+```
+
+Then open:
+
+```text
+http://localhost:5500
+```
+
+The dashboard now calls the live local Monitoring, Healing, and AI Prediction APIs when they are running. If an API is offline, it falls back to demo mode so the UI still works.
+
 ## Python Prediction Demo
 
 This path uses only the Python standard library.

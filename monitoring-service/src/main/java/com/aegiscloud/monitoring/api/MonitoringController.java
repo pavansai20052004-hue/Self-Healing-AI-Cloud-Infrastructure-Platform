@@ -5,6 +5,7 @@ import com.aegiscloud.core.domain.MetricSample;
 import com.aegiscloud.core.domain.Prediction;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
+@CrossOrigin(origins = {"http://localhost:5500", "http://127.0.0.1:5500"})
 @RequestMapping("/api/v1")
 public class MonitoringController {
     private final AnomalyDetector detector = new AnomalyDetector();
@@ -87,4 +89,3 @@ public class MonitoringController {
     ) {
     }
 }
-

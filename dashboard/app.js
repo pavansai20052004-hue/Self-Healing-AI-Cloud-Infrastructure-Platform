@@ -5,6 +5,15 @@ const services = [
   { name: "notification-service", cpu: 31, memory: 41, latency: 82, errorRate: 0.1, replicas: 1, status: "healthy" },
 ];
 
+const api = {
+  monitoring: "http://localhost:8081/api/v1",
+  healing: "http://localhost:8082/api/v1/heal",
+  incidents: "http://localhost:8083/api/v1/incidents",
+  ai: "http://localhost:8090",
+};
+
+const requestTimeoutMs = 3500;
+
 let activeIncident = {
   type: "No active incident",
   service: "cluster",
@@ -54,12 +63,14 @@ const autopilotSteps = document.querySelector("#autopilotSteps");
 const rollbackTriggers = document.querySelector("#rollbackTriggers");
 
 document.querySelectorAll("[data-scenario]").forEach((button) => {
-  button.addEventListener("click", () => injectScenario(button.dataset.scenario));
+  button.addEventListener("click", () => {
+    void injectScenario(button.dataset.scenario);
+  });
 });
 
 document.querySelector("#healButton").addEventListener("click", healIncident);
 
-function injectScenario(scenario) {
+async function injectScenario(scenario) {
   const service = services[0];
   if (scenario === "cpu") {
     Object.assign(service, { cpu: 98, memory: 72, latency: 520, errorRate: 2.4, status: "degraded" });
@@ -165,7 +176,9 @@ function injectScenario(scenario) {
     title: "Guardrails evaluated",
     detail: `${governance.guardrails} under ${governance.autonomy.toLowerCase()} autonomy.`,
   });
-  clusterState.textContent = "Incident predicted";
+  clusterState.textContent = "Incident predicted, querying live APIs";
+  render();
+  await hydrateFromLiveApis(scenario);
   render();
 }
 
@@ -215,6 +228,252 @@ function healIncident() {
   });
   clusterState.textContent = "Autonomous dry-run";
   render();
+}
+
+async function hydrateFromLiveApis(scenario) {
+  const service = services[0];
+  const samples = scenarioSamples(scenario);
+
+  try {
+    const [analysis, aiPrediction] = await Promise.all([
+      postJson(`${api.monitoring}/metrics/analyze`, {
+        serviceName: service.name,
+        samples,
+      }),
+      postJson(`${api.ai}/predict`, {
+        serviceName: service.name,
+        samples,
+      }),
+    ]);
+
+    const predictions = analysis.predictions || [];
+    const leadPrediction = selectLeadPrediction(predictions, scenario);
+    if (!leadPrediction) {
+      throw new Error("Monitoring API returned no incident prediction.");
+    }
+
+    const healingPayload = {
+      dryRun: false,
+      prediction: leadPrediction,
+      state: stateForScenario(scenario),
+      tenantProfile: tenantProfile(),
+      sloBurnRate: sloBurnRateForScenario(scenario),
+    };
+
+    const [decision, plan] = await Promise.all([
+      postJson(`${api.healing}/governed-decisions`, healingPayload),
+      postJson(`${api.healing}/autopilot-plans`, healingPayload),
+    ]);
+
+    activeIncident = {
+      type: leadPrediction.type,
+      service: leadPrediction.serviceName,
+      severity: (leadPrediction.severity || "warning").toLowerCase(),
+      summary: `${leadPrediction.summary} AI risk ${Math.round((aiPrediction.riskScore || 0) * 100)}% in ${aiPrediction.failureWindowMinutes || "unknown"} minutes.`,
+    };
+    policies = policiesFromDecision(decision);
+    safetyPlan = safetyPlanFromApi(plan);
+    governance = {
+      autonomy: "Supervised",
+      burnRate: `${sloBurnRateForScenario(scenario).burnRate}x`,
+      guardrails: guardrailSummary(decision),
+    };
+    clusterState.textContent = "Live backend APIs connected";
+    timeline.unshift({
+      title: "Live backend APIs responded",
+      detail: `Monitoring found ${predictions.length} prediction(s), AI labeled ${aiPrediction.labels.join(", ")}, and healing returned ${plan.executionMode}.`,
+    });
+  } catch (error) {
+    clusterState.textContent = "Simulation mode, backend fallback";
+    timeline.unshift({
+      title: "Backend API fallback",
+      detail: `Dashboard kept the local simulation because live API hydration failed: ${error.message}`,
+    });
+  }
+}
+
+async function postJson(url, body) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function scenarioSamples(scenario) {
+  const now = Date.now();
+  const minute = 60 * 1000;
+  const service = services[0];
+  const shape = {
+    cpu: [
+      [48, 54, 118, 0.004, 42],
+      [68, 61, 180, 0.008, 43],
+      [82, 67, 310, 0.014, 44],
+      [91, 71, 460, 0.021, 45],
+      [98, 72, 520, 0.024, 46],
+    ],
+    memory: [
+      [42, 52, 120, 0.004, 42],
+      [52, 64, 180, 0.006, 43],
+      [64, 76, 260, 0.009, 44],
+      [72, 86, 360, 0.014, 45],
+      [76, 94, 460, 0.018, 46],
+    ],
+    latency: [
+      [44, 50, 110, 0.004, 42],
+      [58, 55, 220, 0.006, 43],
+      [69, 60, 540, 0.012, 44],
+      [78, 64, 920, 0.022, 45],
+      [84, 68, 1240, 0.031, 46],
+    ],
+    errors: [
+      [52, 48, 130, 0.003, 42],
+      [68, 57, 210, 0.006, 44],
+      [79, 70, 390, 0.014, 46],
+      [88, 82, 740, 0.041, 48],
+      [94, 90, 980, 0.092, 50],
+    ],
+  }[scenario] || [];
+
+  return shape.map(([cpuUsage, memoryUsage, latencyMs, errorRate, diskUsage], index) => ({
+    timestamp: new Date(now - (shape.length - index - 1) * minute).toISOString(),
+    cpuUsage,
+    memoryUsage,
+    latencyMs,
+    errorRate,
+    diskUsage,
+    replicas: service.replicas,
+  }));
+}
+
+function selectLeadPrediction(predictions, scenario) {
+  const preferred = {
+    cpu: "CPU_SATURATION",
+    memory: "MEMORY_LEAK",
+    latency: "LATENCY_SPIKE",
+    errors: "ERROR_RATE",
+  }[scenario];
+  return predictions.find((prediction) => prediction.type === preferred)
+    || predictions.sort((left, right) => right.confidence - left.confidence)[0];
+}
+
+function stateForScenario(scenario) {
+  const service = services[0];
+  const queueDepth = scenario === "latency" || scenario === "errors" ? 2400 : 800;
+  return {
+    serviceName: service.name,
+    replicas: service.replicas,
+    minReplicas: 2,
+    maxReplicas: 6,
+    lastDeploymentAgeMinutes: scenario === "errors" ? 8 : 45,
+    restartCountLastHour: scenario === "memory" ? 3 : 1,
+    queueDepth,
+    currentVersion: "v2.4.1",
+    previousVersion: "v2.4.0",
+  };
+}
+
+function tenantProfile() {
+  return {
+    tenantId: "fintech-prod",
+    displayName: "Northstar Payments",
+    environment: "production",
+    autonomyMode: "SUPERVISED",
+    highRiskApprovalRequired: true,
+    maxReplicas: 6,
+    maxActionsPerIncident: 2,
+    actionCooldownSeconds: 180,
+    maxAllowedBurnRate: 14.4,
+    allowedActions: [
+      "SCALE_OUT",
+      "RESTART_SERVICE",
+      "ROLLBACK_DEPLOYMENT",
+      "CLEAR_QUEUE",
+      "THROTTLE_TRAFFIC",
+      "PRUNE_LOGS",
+      "OPEN_INCIDENT",
+    ],
+  };
+}
+
+function sloBurnRateForScenario(scenario) {
+  const burnRates = {
+    cpu: 11.7,
+    memory: 16.4,
+    latency: 18.9,
+    errors: 29.2,
+  };
+  const burnRateValue = burnRates[scenario] || 1.0;
+  return {
+    serviceName: services[0].name,
+    burnRate: burnRateValue,
+    budgetRemainingPercent: burnRateValue > 20 ? 12.6 : 28.0,
+    status: burnRateValue > 20 ? "BURNING" : "WATCH",
+    recommendation: "Prioritize low-risk remediation and page the owning team.",
+  };
+}
+
+function policiesFromDecision(decision) {
+  if (decision.guardrailAssessments && decision.guardrailAssessments.length > 0) {
+    return decision.guardrailAssessments.map((assessment) => ({
+      action: assessment.action.type,
+      reason: assessment.action.reason,
+      risk: assessment.action.riskLevel,
+      verdict: assessment.verdict.toLowerCase().replaceAll("_", " "),
+    }));
+  }
+  return (decision.actions || []).map((action) => ({
+    action: action.type,
+    reason: action.reason,
+    risk: action.riskLevel,
+    verdict: decision.dryRun ? "dry run only" : "approved",
+  }));
+}
+
+function safetyPlanFromApi(plan) {
+  const lead = (plan.impactEstimates || [])[0];
+  return {
+    action: lead ? lead.actionType : "AUTOPILOT_PLAN",
+    recommendation: plan.recommendation,
+    recoveryProbability: plan.expectedRecoveryProbability,
+    residualRisk: plan.residualRiskScore,
+    blastRadius: plan.maxBlastRadiusPercent,
+    confidence: plan.overallConfidence,
+    steps: (plan.steps || []).map((step) => ({
+      phase: step.phase,
+      title: step.title,
+      command: step.commandPreview,
+    })),
+    triggers: plan.rollbackTriggers || [],
+  };
+}
+
+function guardrailSummary(decision) {
+  const assessments = decision.guardrailAssessments || [];
+  if (assessments.length === 0) {
+    return decision.executionMode || "ready";
+  }
+  const approved = assessments.filter((item) => item.verdict === "APPROVED").length;
+  const approvals = assessments.filter((item) => item.verdict === "REQUIRES_APPROVAL").length;
+  const blocked = assessments.filter((item) => item.verdict === "BLOCKED").length;
+  if (approvals > 0) {
+    return `${approvals} approval gate`;
+  }
+  if (blocked > 0) {
+    return `${blocked} blocked`;
+  }
+  return `${approved} approved`;
 }
 
 function render() {

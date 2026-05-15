@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.engine import classify_log_line, predict_failure
@@ -12,6 +13,14 @@ app = FastAPI(
     title="AegisCloud AI Prediction Service",
     version="0.1.0",
     description="Lightweight anomaly prediction and log classification service for the AegisCloud platform.",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5500", "http://127.0.0.1:5500"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -57,4 +66,3 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
 @app.post("/classify-log")
 def classify_log(request: LogRequest) -> dict[str, Any]:
     return classify_log_line(request.line)
-

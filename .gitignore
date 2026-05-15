@@ -9,5 +9,5 @@ __pycache__/
 .venv/
 node_modules/
 dist/
+oracleJdk-*/
 .DS_Store
-
