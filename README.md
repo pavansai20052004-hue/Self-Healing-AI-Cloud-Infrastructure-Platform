@@ -56,13 +56,19 @@ This path uses only the Python standard library.
 
 ## Static Dashboard
 
-Open this file in a browser:
+Launch the UI from VS Code or PowerShell:
+
+```powershell
+.\scripts\start-dashboard.ps1
+```
+
+Or open this file in a browser:
 
 ```text
 dashboard/index.html
 ```
 
-The dashboard simulates chaos injection, live diagnosis, policy ranking, self-healing, and incident replay without needing a backend server.
+The dashboard simulates chaos injection, live diagnosis, policy ranking, counterfactual safety planning, self-healing, and incident replay without needing a backend server.
 
 ## Spring Boot Services
 
