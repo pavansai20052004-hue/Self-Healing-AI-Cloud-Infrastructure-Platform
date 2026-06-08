@@ -28,7 +28,7 @@ public class IncidentStorageConfiguration {
 
         String normalizedUrl = normalizeUrl(rawUrl);
         URI uri = URI.create(normalizedUrl);
-        String jdbcUrl = toJdbcUrl(normalizedUrl);
+        String jdbcUrl = toJdbcUrl(uri);
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(jdbcUrl);
         if (uri.getUserInfo() != null && uri.getUserInfo().contains(":")) {
@@ -69,11 +69,32 @@ public class IncidentStorageConfiguration {
         return rawUrl;
     }
 
-    private static String toJdbcUrl(String normalizedUrl) {
-        if (normalizedUrl.startsWith("jdbc:")) {
-            return normalizedUrl;
+    private static String toJdbcUrl(URI uri) {
+        StringBuilder jdbcUrl = new StringBuilder("jdbc:");
+        jdbcUrl.append(uri.getScheme()).append("://");
+
+        if (uri.getHost() == null || uri.getHost().isBlank()) {
+            throw new IllegalStateException("DATABASE_URL is missing a host");
         }
-        return "jdbc:" + normalizedUrl;
+        jdbcUrl.append(uri.getHost());
+
+        if (uri.getPort() != -1) {
+            jdbcUrl.append(':').append(uri.getPort());
+        }
+
+        if (uri.getRawPath() != null) {
+            jdbcUrl.append(uri.getRawPath());
+        }
+
+        if (uri.getRawQuery() != null && !uri.getRawQuery().isBlank()) {
+            jdbcUrl.append('?').append(uri.getRawQuery());
+        }
+
+        if (uri.getRawFragment() != null && !uri.getRawFragment().isBlank()) {
+            jdbcUrl.append('#').append(uri.getRawFragment());
+        }
+
+        return jdbcUrl.toString();
     }
 
     private static String decode(String value) {

@@ -11,3 +11,5 @@ node_modules/
 dist/
 oracleJdk-*/
 .DS_Store
+
+.vercel
