@@ -1,4 +1,4 @@
-function createProxyHandler({ backendUrlEnv }) {
+function createProxyHandler({ backendUrlEnv, backendPathPrefix = "" }) {
   return async function proxyHandler(req, res) {
     if (req.method === "OPTIONS") {
       res.status(204).end();
@@ -16,8 +16,9 @@ function createProxyHandler({ backendUrlEnv }) {
     const pathSegments = normalizePathSegments(req.query.path);
     const target = new URL(baseUrl);
     const basePath = target.pathname.replace(/\/$/, "");
+    const prefixPath = normalizeBasePath(backendPathPrefix);
     const extraPath = pathSegments.join("/");
-    target.pathname = `${basePath}${extraPath ? `/${extraPath}` : ""}` || "/";
+    target.pathname = `${basePath}${prefixPath}${extraPath ? `/${extraPath}` : ""}` || "/";
     target.search = new URL(req.url, "http://localhost").search;
 
     const headers = new Headers();
@@ -73,6 +74,16 @@ function normalizePathSegments(pathValue) {
     return [];
   }
   return [String(pathValue)];
+}
+
+function normalizeBasePath(pathValue) {
+  if (pathValue == null || pathValue === "") {
+    return "";
+  }
+  const segments = String(pathValue)
+    .split("/")
+    .filter(Boolean);
+  return segments.length > 0 ? `/${segments.join("/")}` : "";
 }
 
 module.exports = {
