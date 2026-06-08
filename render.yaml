@@ -6,7 +6,6 @@ services:
     dockerfilePath: monitoring-service/Dockerfile
     dockerContext: .
     healthCheckPath: /api/v1/healthz
-    maxShutdownDelaySeconds: 60
 
   - type: web
     name: healing-engine
@@ -15,7 +14,6 @@ services:
     dockerfilePath: healing-engine/Dockerfile
     dockerContext: .
     healthCheckPath: /api/v1/heal/healthz
-    maxShutdownDelaySeconds: 60
 
   - type: web
     name: incident-intelligence-service
@@ -24,7 +22,6 @@ services:
     dockerfilePath: incident-intelligence-service/Dockerfile
     dockerContext: .
     healthCheckPath: /api/v1/incidents/healthz
-    maxShutdownDelaySeconds: 60
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -36,4 +33,3 @@ services:
     dockerfilePath: ai-prediction-service/Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
-    maxShutdownDelaySeconds: 60
