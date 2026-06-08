@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import os
 
 from app.engine import classify_log_line, predict_failure
 
@@ -66,3 +67,14 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
 @app.post("/classify-log")
 def classify_log(request: LogRequest) -> dict[str, Any]:
     return classify_log_line(request.line)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8090")),
+        reload=False,
+    )

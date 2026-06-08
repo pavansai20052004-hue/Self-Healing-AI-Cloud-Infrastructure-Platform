@@ -5,16 +5,18 @@ const services = [
   { name: "notification-service", cpu: 31, memory: 41, latency: 82, errorRate: 0.1, replicas: 1, status: "healthy" },
 ];
 
+const hostname = window.location.hostname || "";
+const isLocalHost = hostname === "" || hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+
 const api = {
-  monitoring: "http://localhost:8081/api/v1",
-  healing: "http://localhost:8082/api/v1/heal",
-  incidents: "http://localhost:8083/api/v1/incidents",
-  ai: "http://localhost:8090",
+  monitoring: isLocalHost ? "http://localhost:8081/api/v1" : "/api/monitoring",
+  healing: isLocalHost ? "http://localhost:8082/api/v1/heal" : "/api/healing",
+  incidents: isLocalHost ? "http://localhost:8083/api/v1/incidents" : "/api/incidents",
+  ai: isLocalHost ? "http://localhost:8090" : "/api/ai",
 };
 
-const requestTimeoutMs = 3500;
-const browserHost = typeof window === "undefined" ? "localhost" : window.location.hostname;
-const liveApiEnabled = ["", "localhost", "127.0.0.1"].includes(browserHost);
+const requestTimeoutMs = 8000;
+const liveApiEnabled = typeof window !== "undefined" && window.location.protocol !== "file:";
 
 let activeIncident = {
   type: "No active incident",
@@ -324,6 +326,23 @@ async function hydrateFromLiveApis(scenario, requestId) {
       title: "Live Healing Autopilot planned response",
       detail: `${plan.recommendation}`,
     });
+
+    try {
+      const report = await postJson(`${api.incidents}/reports`, {
+        prediction: leadPrediction,
+        decision,
+        recentLogs: recentLogsForScenario(scenario),
+      });
+      timeline.unshift({
+        title: "Incident report archived",
+        detail: `${report.reportId} stored in ${report.persisted ? "Neon" : "local fallback storage"}.`,
+      });
+    } catch (reportError) {
+      timeline.unshift({
+        title: "Incident report fallback",
+        detail: `Incident intelligence stayed local because persistence was unavailable: ${reportError.message}`,
+      });
+    }
   } catch (error) {
     if (requestId !== requestSequence) {
       return;
@@ -399,6 +418,36 @@ function scenarioSamples(scenario) {
     diskUsage,
     replicas: service.replicas,
   }));
+}
+
+function recentLogsForScenario(scenario) {
+  const logs = {
+    cpu: [
+      "WARN payment-service p95 latency climbed above 520ms after traffic burst",
+      "WARN payment-service CPU throttling observed on the primary pod",
+      "INFO rollout v2.4.2 canary remained healthy during first replica shift",
+    ],
+    memory: [
+      "WARN payment-service heap usage climbed from 68% to 94% in 10m",
+      "WARN payment-service restart count reached 3 within the last hour",
+      "INFO GC pause lengthened before the memory leak signature appeared",
+    ],
+    latency: [
+      "WARN payment-service queue depth crossed 2400 pending requests",
+      "WARN payment-service p95 latency exceeded 1.2s for three windows",
+      "INFO downstream checkout dependency remained healthy during the spike",
+    ],
+    errors: [
+      "ERROR payment-service 5xx rate surged after deployment v2.4.1",
+      "WARN payment-service error budget burn rate crossed 29x",
+      "INFO rollback guardrail raised an approval requirement before execute",
+    ],
+  }[scenario] || [];
+
+  return logs.length > 0 ? logs : [
+    "INFO payment-service remained inside SLO guardrails during the sample window",
+    "INFO no remediation was required for the baseline scenario",
+  ];
 }
 
 function selectLeadPrediction(predictions, scenario) {

@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: monitoring-service
+    runtime: docker
+    plan: free
+    dockerfilePath: monitoring-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/healthz
+    maxShutdownDelaySeconds: 60
+
+  - type: web
+    name: healing-engine
+    runtime: docker
+    plan: free
+    dockerfilePath: healing-engine/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/heal/healthz
+    maxShutdownDelaySeconds: 60
+
+  - type: web
+    name: incident-intelligence-service
+    runtime: docker
+    plan: free
+    dockerfilePath: incident-intelligence-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/incidents/healthz
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+
+  - type: web
+    name: ai-prediction-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ai-prediction-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    maxShutdownDelaySeconds: 60

@@ -6,5 +6,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 
 EXPOSE 8090
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8090"]
-
+CMD ["python", "-m", "app.main"]

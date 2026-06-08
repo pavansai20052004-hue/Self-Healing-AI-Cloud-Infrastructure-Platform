@@ -1,5 +1,6 @@
 server:
-  port: 8082
+  address: 0.0.0.0
+  port: ${PORT:8082}
 
 spring:
   application:
@@ -14,4 +15,3 @@ management:
     health:
       probes:
         enabled: true
-

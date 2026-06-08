@@ -2,7 +2,7 @@
 
 AegisCloud is a Java-first AIOps platform that detects infrastructure anomalies, predicts likely failures, selects automated remediation actions, and generates incident intelligence reports.
 
-The project is built to be demo-friendly for interviews: it has an offline Java core demo, Spring Boot microservice wrappers, a FastAPI prediction service, Kubernetes manifests, Prometheus config, and a static operations dashboard.
+The project is built to be demo-friendly for interviews: it has an offline Java core demo, Spring Boot microservice wrappers, a FastAPI prediction service, Kubernetes manifests, Prometheus config, a static operations dashboard, and production deployment wiring for Vercel, Render, and Neon.
 
 ## What It Demonstrates
 
@@ -27,6 +27,9 @@ healing-engine/                   Spring Boot remediation policy API
 incident-intelligence-service/    Spring Boot RCA report API
 ai-prediction-service/            FastAPI prediction and log classification service
 dashboard/                        Static recruiter-friendly console demo
+api/                              Vercel proxy functions for the dashboard
+vercel.json                       Vercel static-site deployment config
+render.yaml                       Render Blueprint for backend services
 infra/docker/                     Docker Compose stack
 infra/k8s/                        Kubernetes manifests and RBAC
 infra/postgres/                   Production-oriented schema
@@ -60,7 +63,7 @@ Then open:
 http://localhost:5500
 ```
 
-The dashboard now calls the live local Monitoring, Healing, and AI Prediction APIs when they are running. If an API is offline, it falls back to demo mode so the UI still works.
+The dashboard now calls the live local Monitoring, Healing, Incident Intelligence, and AI Prediction APIs when they are running. If an API is offline, it falls back to demo mode so the UI still works.
 
 ## Python Prediction Demo
 
@@ -84,13 +87,36 @@ Launch the UI from VS Code or PowerShell:
 .\scripts\start-dashboard.ps1
 ```
 
-Or open this file in a browser:
+Then open:
 
 ```text
-dashboard/index.html
+http://localhost:5500
 ```
 
-The dashboard simulates chaos injection, live diagnosis, policy ranking, counterfactual safety planning, self-healing, and incident replay without needing a backend server.
+The dashboard simulates chaos injection, live diagnosis, policy ranking, counterfactual safety planning, self-healing, and incident replay without needing a backend server. When deployed on Vercel it calls same-origin proxy routes under `/api/*`, which forward traffic to the Render services.
+
+## Cloud Deployment
+
+The hosted stack is split across three platforms:
+
+- Vercel: `dashboard/` plus the proxy functions in `api/`
+- Render: `monitoring-service`, `healing-engine`, `incident-intelligence-service`, and `ai-prediction-service`
+- Neon: the incident archive database used by `incident-intelligence-service`
+
+Render Blueprint:
+
+```powershell
+render.yaml
+```
+
+Vercel needs these environment variables in the project settings:
+
+- `RENDER_MONITORING_URL`
+- `RENDER_HEALING_URL`
+- `RENDER_INCIDENT_URL`
+- `RENDER_AI_URL`
+
+Render needs `DATABASE_URL` for `incident-intelligence-service`. Use the Neon connection string there.
 
 ## Spring Boot Services
 
@@ -143,13 +169,13 @@ The healing engine is intentionally configured for dry-run and supervised remedi
 4. The healing engine ranks actions using service state and learned policy scores.
 5. Governance guardrails decide whether actions are approved, dry-run-only, blocked, or approval-gated.
 6. The counterfactual autopilot planner simulates recovery probability, residual risk, blast radius, canary steps, and rollback triggers.
-7. Incident intelligence generates a root-cause report and next checks.
+7. Incident intelligence generates a root-cause report, stores it in Neon, and prepares next checks.
 8. The dashboard replays the incident timeline, safety plan, and audit trail.
 
 ## Next Build Milestones
 
 - Add Kafka events between services.
-- Persist incidents, metrics, and policy outcomes in PostgreSQL.
+- Persist metrics and policy outcomes in Neon alongside the incident archive.
 - Add RBAC, tenant isolation, and audit logs.
 - Connect the healing engine to the Kubernetes Java client.
 - Add OpenTelemetry tracing and Grafana dashboards.
