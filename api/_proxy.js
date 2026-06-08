@@ -1,4 +1,4 @@
-function createProxyHandler({ backendUrlEnv, backendPathPrefix = "" }) {
+function createProxyHandler({ backendUrlEnv, backendPathPrefix = "", routePrefix = "" }) {
   return async function proxyHandler(req, res) {
     if (req.method === "OPTIONS") {
       res.status(204).end();
@@ -13,7 +13,7 @@ function createProxyHandler({ backendUrlEnv, backendPathPrefix = "" }) {
       return;
     }
 
-    const pathSegments = normalizePathSegments(req.query.path);
+    const pathSegments = extractPathSegments(req.url, routePrefix);
     const target = new URL(baseUrl);
     const basePath = target.pathname.replace(/\/$/, "");
     const prefixPath = normalizeBasePath(backendPathPrefix);
@@ -66,14 +66,21 @@ function createProxyHandler({ backendUrlEnv, backendPathPrefix = "" }) {
   };
 }
 
-function normalizePathSegments(pathValue) {
-  if (Array.isArray(pathValue)) {
-    return pathValue.filter(Boolean).map((segment) => String(segment));
-  }
-  if (pathValue == null || pathValue === "") {
+function extractPathSegments(requestUrl, routePrefix) {
+  const pathname = new URL(requestUrl || "/", "http://localhost").pathname;
+  const normalizedPrefix = normalizeBasePath(routePrefix);
+  if (!normalizedPrefix) {
     return [];
   }
-  return [String(pathValue)];
+  if (pathname === normalizedPrefix) {
+    return [];
+  }
+  const prefixWithSlash = `${normalizedPrefix}/`;
+  if (!pathname.startsWith(prefixWithSlash)) {
+    return [];
+  }
+  const suffix = pathname.slice(prefixWithSlash.length);
+  return suffix.split("/").filter(Boolean).map((segment) => String(segment));
 }
 
 function normalizeBasePath(pathValue) {
